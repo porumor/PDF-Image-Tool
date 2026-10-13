@@ -81,12 +81,12 @@
             </button>
         </div>
 
-        <div class="flex-1 bg-slate-950 relative flex items-center justify-center p-12 overflow-auto select-none" id="workspaceContainer">
+        <div class="flex-1 bg-slate-950 relative flex items-center justify-center p-12 overflow-auto select-none hidden" id="workspaceContainer">
             <div id="imageStage" class="relative shadow-2xl rounded-lg border border-slate-800 shrink-0">
                 <canvas id="previewCanvas" class="block overflow-hidden rounded-lg"></canvas>
                 <div id="eraserSelectBox" class="absolute border-2 border-red-500 bg-red-500/20 z-30 hidden pointer-events-none"></div>
 
-                <div id="cropBox" class="absolute border-2 border-indigo-400 bg-indigo-500/10 cursor-move shadow-2xl z-40">
+                <div id="cropBox" class="absolute border-2 border-indigo-400 bg-indigo-500/10 cursor-move shadow-2xl z-40 hidden">
                     <div class="absolute inset-0 pointer-events-none border border-white/40"></div>
                     <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
                         <div class="absolute inset-[12%] border-2 border-red-500 border-dashed rounded opacity-90"></div>
@@ -101,7 +101,7 @@
             </div>
         </div>
 
-        <aside class="w-80 bg-slate-900 border-l border-slate-800 p-6 flex flex-col justify-between shrink-0 shadow-xl overflow-y-auto z-30">
+        <aside id="sidebarPanel" class="w-80 bg-slate-900 border-l border-slate-800 p-6 flex flex-col justify-between shrink-0 shadow-xl overflow-y-auto z-30 hidden">
             <div class="space-y-6">
                 <div class="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
                     <button id="modeCropBtn" class="py-2.5 px-3 text-xs font-semibold rounded-lg bg-indigo-600 text-white transition shadow">
@@ -187,6 +187,7 @@
         const fileInput = document.getElementById('fileInput');
         const uploadView = document.getElementById('uploadView');
         const workspaceContainer = document.getElementById('workspaceContainer');
+        const sidebarPanel = document.getElementById('sidebarPanel');
         const imageStage = document.getElementById('imageStage');
         const previewCanvas = document.getElementById('previewCanvas');
         const pCtx = previewCanvas.getContext('2d');
@@ -286,6 +287,11 @@
             }
 
             uploadView.classList.add('hidden');
+            workspaceContainer.classList.remove('hidden');
+            sidebarPanel.classList.remove('hidden');
+            if (currentMode === 'crop') {
+                cropBox.classList.remove('hidden');
+            }
             resetAllBtn.classList.remove('hidden');
         }
 
@@ -331,6 +337,9 @@
 
         resetAllBtn.addEventListener('click', () => {
             uploadView.classList.remove('hidden');
+            workspaceContainer.classList.add('hidden');
+            sidebarPanel.classList.add('hidden');
+            cropBox.classList.add('hidden');
             resetAllBtn.classList.add('hidden');
             pdfPaginationBar.classList.add('hidden');
             fileInput.value = '';
@@ -614,7 +623,6 @@
                 exportCanvas.height = targetH;
                 const expCtx = exportCanvas.getContext('2d');
 
-                // Fill missing/out-of-bounds areas with white if Invert is OFF, or black if Invert is ON
                 expCtx.fillStyle = invertToggle.checked ? '#000000' : '#ffffff';
                 expCtx.fillRect(0, 0, targetW, targetH);
 
