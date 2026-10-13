@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .crop-handle {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background-color: #6366f1;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            z-index: 25;
+            box-shadow: 0 0 6px rgba(0,0,0,0.5);
+        }
+        .handle-nw { top: -7px; left: -7px; cursor: nwse-resize; }
+        .handle-ne { top: -7px; right: -7px; cursor: nesw-resize; }
+        .handle-sw { bottom: -7px; left: -7px; cursor: nesw-resize; }
+        .handle-se { bottom: -7px; right: -7px; cursor: nwse-resize; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-full flex flex-col overflow-hidden">
+
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between shrink-0 shadow-md z-30">
+        <div class="flex items-center space-x-3">
+            <div class="bg-indigo-600 p-2 rounded-xl text-white shadow-inner">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+            </div>
+            <h1 class="text-lg font-bold tracking-tight text-white">PDF & Image Tool</h1>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button id="resetAllBtn" class="hidden px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium rounded-lg transition shadow border border-slate-700">
+                เปลี่ยนไฟล์
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden relative">
+
+        <div id="uploadView" class="absolute inset-0 flex items-center justify-center p-6 bg-slate-950 z-40">
+            <div class="max-w-xl w-full bg-slate-900 border-2 border-dashed border-slate-700 rounded-2xl p-10 text-center shadow-2xl transition hover:border-indigo-500 group">
+                <div class="mx-auto w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-600/20 text-indigo-400 transition border border-slate-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                </div>
+                <label class="inline-block px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl cursor-pointer shadow-lg transition transform active:scale-95">
+                    เลือกไฟล์
+                    <input type="file" id="fileInput" accept=".pdf,image/*" class="hidden">
+                </label>
+            </div>
+        </div>
+
+        <div id="pdfPaginationBar" class="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur border border-slate-700 px-4 py-2 rounded-xl shadow-2xl z-30 hidden flex items-center space-x-4">
+            <button id="prevPageBtn" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white disabled:opacity-40 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            <span id="pageIndicator" class="text-sm font-medium text-slate-200">1 / 1</span>
+            <button id="nextPageBtn" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white disabled:opacity-40 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="flex-1 bg-slate-950 relative flex items-center justify-center p-12 overflow-auto select-none" id="workspaceContainer">
+            <div id="imageStage" class="relative shadow-2xl rounded-lg border border-slate-800 shrink-0">
+                <canvas id="previewCanvas" class="block overflow-hidden rounded-lg"></canvas>
+                <div id="eraserSelectBox" class="absolute border-2 border-red-500 bg-red-500/20 z-30 hidden pointer-events-none"></div>
+
+                <div id="cropBox" class="absolute border-2 border-indigo-400 bg-indigo-500/10 cursor-move shadow-2xl z-40">
+                    <div class="absolute inset-0 pointer-events-none border border-white/40"></div>
+                    <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                        <div class="absolute inset-[12%] border-2 border-red-500 border-dashed rounded opacity-90"></div>
+                        <div class="absolute w-8 h-0.5 bg-red-500 shadow-sm"></div>
+                        <div class="absolute w-0.5 h-8 bg-red-500 shadow-sm"></div>
+                    </div>
+                    <div class="crop-handle handle-nw" data-handle="nw"></div>
+                    <div class="crop-handle handle-ne" data-handle="ne"></div>
+                    <div class="crop-handle handle-sw" data-handle="sw"></div>
+                    <div class="crop-handle handle-se" data-handle="se"></div>
+                </div>
+            </div>
+        </div>
+
+        <aside class="w-80 bg-slate-900 border-l border-slate-800 p-6 flex flex-col justify-between shrink-0 shadow-xl overflow-y-auto z-30">
+            <div class="space-y-6">
+                <div class="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button id="modeCropBtn" class="py-2.5 px-3 text-xs font-semibold rounded-lg bg-indigo-600 text-white transition shadow">
+                        ครอป
+                    </button>
+                    <button id="modeEraserBtn" class="py-2.5 px-3 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition">
+                        ลบ
+                    </button>
+                </div>
+
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-slate-200">Invert</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="invertToggle" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="eraserControls" class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 hidden">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-slate-200">จุดลบ</span>
+                        <span id="eraserCountBadge" class="text-xs bg-indigo-900 text-indigo-200 px-2.5 py-0.5 rounded-full font-medium">0</span>
+                    </div>
+                    <button id="undoEraserBtn" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 rounded-lg transition border border-slate-700 disabled:opacity-40">
+                        ยกเลิก
+                    </button>
+                </div>
+
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                    <label for="resolutionSelect" class="text-sm font-medium text-slate-200 block">ความละเอียด</label>
+                    <select id="resolutionSelect" class="w-full bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-indigo-500">
+                        <option value="1080">1080 x 1920 (FHD)</option>
+                        <option value="1440">1440 x 2560 (1.5K)</option>
+                        <option value="2048">2048 x 3640 (2K)</option>
+                        <option value="2560">2560 x 4551 (2.5K)</option>
+                    </select>
+                </div>
+
+                <div id="cropControls" class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="centerCropBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 rounded-lg transition border border-slate-700">
+                            กึ่งกลาง
+                        </button>
+                        <button id="resetCropBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 rounded-lg transition border border-slate-700">
+                            รีเซ็ต
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-6 border-t border-slate-800">
+                <button id="downloadBtn" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>ดาวน์โหลด</span>
+                </button>
+            </div>
+        </aside>
+
+    </main>
+
+    <script>
+        let sourceOriginalCanvas = null;
+        let sourceInvertedCanvas = null;
+        let sourceWidth = 0;
+        let sourceHeight = 0;
+
+        let pdfDoc = null;
+        let currentPageNum = 1;
+        let totalPages = 1;
+        let isPdf = false;
+
+        let eraserRects = [];
+        let currentMode = 'crop';
+
+        let stageScale = 1.0;
+        let cropState = { x: 0, y: 0, w: 0, h: 0 };
+        const ASPECT_RATIO = 1080 / 1920;
+
+        const fileInput = document.getElementById('fileInput');
+        const uploadView = document.getElementById('uploadView');
+        const workspaceContainer = document.getElementById('workspaceContainer');
+        const imageStage = document.getElementById('imageStage');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const pCtx = previewCanvas.getContext('2d');
+        const cropBox = document.getElementById('cropBox');
+        const eraserSelectBox = document.getElementById('eraserSelectBox');
+        const invertToggle = document.getElementById('invertToggle');
+        const resolutionSelect = document.getElementById('resolutionSelect');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const resetAllBtn = document.getElementById('resetAllBtn');
+        const pdfPaginationBar = document.getElementById('pdfPaginationBar');
+        const prevPageBtn = document.getElementById('prevPageBtn');
+        const nextPageBtn = document.getElementById('nextPageBtn');
+        const pageIndicator = document.getElementById('pageIndicator');
+        const centerCropBtn = document.getElementById('centerCropBtn');
+        const resetCropBtn = document.getElementById('resetCropBtn');
+        const modeCropBtn = document.getElementById('modeCropBtn');
+        const modeEraserBtn = document.getElementById('modeEraserBtn');
+        const eraserControls = document.getElementById('eraserControls');
+        const cropControls = document.getElementById('cropControls');
+        const undoEraserBtn = document.getElementById('undoEraserBtn');
+        const eraserCountBadge = document.getElementById('eraserCountBadge');
+
+        modeCropBtn.addEventListener('click', () => {
+            currentMode = 'crop';
+            modeCropBtn.className = "py-2.5 px-3 text-xs font-semibold rounded-lg bg-indigo-600 text-white transition shadow";
+            modeEraserBtn.className = "py-2.5 px-3 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition";
+            cropBox.classList.remove('hidden');
+            eraserControls.classList.add('hidden');
+            cropControls.classList.remove('hidden');
+        });
+
+        modeEraserBtn.addEventListener('click', () => {
+            currentMode = 'eraser';
+            modeEraserBtn.className = "py-2.5 px-3 text-xs font-semibold rounded-lg bg-indigo-600 text-white transition shadow";
+            modeCropBtn.className = "py-2.5 px-3 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition";
+            cropBox.classList.add('hidden');
+            eraserControls.classList.remove('hidden');
+            cropControls.classList.add('hidden');
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        });
+
+        const dropZone = uploadView;
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+        async function handleFile(file) {
+            eraserRects = [];
+            updateEraserBadge();
+            if (file.type === 'application/pdf') {
+                isPdf = true;
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    totalPages = pdfDoc.numPages;
+                    currentPageNum = 1;
+                    pdfPaginationBar.classList.remove('hidden');
+                    await loadPdfPage(currentPageNum);
+                } catch (err) {
+                    console.error(err);
+                    return;
+                }
+            } else if (file.type.startsWith('image/')) {
+                isPdf = false;
+                pdfPaginationBar.classList.add('hidden');
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const scaleFactor = 4.0;
+                        sourceWidth = Math.round(img.naturalWidth * scaleFactor);
+                        sourceHeight = Math.round(img.naturalHeight * scaleFactor);
+
+                        sourceOriginalCanvas = document.createElement('canvas');
+                        sourceOriginalCanvas.width = sourceWidth;
+                        sourceOriginalCanvas.height = sourceHeight;
+                        const sCtx = sourceOriginalCanvas.getContext('2d');
+                        sCtx.imageSmoothingEnabled = true;
+                        sCtx.imageSmoothingQuality = 'high';
+                        sCtx.drawImage(img, 0, 0, sourceWidth, sourceHeight);
+
+                        prepareInvertedCanvas();
+                        setupStage();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                return;
+            }
+
+            uploadView.classList.add('hidden');
+            resetAllBtn.classList.remove('hidden');
+        }
+
+        async function loadPdfPage(pageNum) {
+            eraserRects = [];
+            updateEraserBadge();
+            pageIndicator.textContent = `${pageNum} / ${totalPages}`;
+            prevPageBtn.disabled = pageNum <= 1;
+            nextPageBtn.disabled = pageNum >= totalPages;
+
+            const page = await pdfDoc.getPage(pageNum);
+            const renderScale = 6.0;
+            const viewport = page.getViewport({ scale: renderScale });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const context = canvas.getContext('2d');
+
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+            sourceWidth = canvas.width;
+            sourceHeight = canvas.height;
+            sourceOriginalCanvas = canvas;
+
+            prepareInvertedCanvas();
+            setupStage();
+        }
+
+        prevPageBtn.addEventListener('click', () => {
+            if (currentPageNum > 1) {
+                currentPageNum--;
+                loadPdfPage(currentPageNum);
+            }
+        });
+
+        nextPageBtn.addEventListener('click', () => {
+            if (currentPageNum < totalPages) {
+                currentPageNum++;
+                loadPdfPage(currentPageNum);
+            }
+        });
+
+        resetAllBtn.addEventListener('click', () => {
+            uploadView.classList.remove('hidden');
+            resetAllBtn.classList.add('hidden');
+            pdfPaginationBar.classList.add('hidden');
+            fileInput.value = '';
+            sourceOriginalCanvas = null;
+            sourceInvertedCanvas = null;
+            pdfDoc = null;
+            isPdf = false;
+            eraserRects = [];
+        });
+
+        function prepareInvertedCanvas() {
+            if (!sourceOriginalCanvas) return;
+            const invCanvas = document.createElement('canvas');
+            invCanvas.width = sourceWidth;
+            invCanvas.height = sourceHeight;
+            const invCtx = invCanvas.getContext('2d');
+            invCtx.drawImage(sourceOriginalCanvas, 0, 0);
+
+            const imgData = invCtx.getImageData(0, 0, sourceWidth, sourceHeight);
+            const data = imgData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                data[i] = 255 - data[i];
+                data[i+1] = 255 - data[i+1];
+                data[i+2] = 255 - data[i+2];
+            }
+            invCtx.putImageData(imgData, 0, 0);
+            sourceInvertedCanvas = invCanvas;
+            renderPreviewCanvas();
+        }
+
+        function renderPreviewCanvas() {
+            if (!sourceOriginalCanvas) return;
+            const active = invertToggle.checked ? sourceInvertedCanvas : sourceOriginalCanvas;
+            previewCanvas.width = active.width;
+            previewCanvas.height = active.height;
+            pCtx.drawImage(active, 0, 0);
+
+            const eraserColor = invertToggle.checked ? '#000000' : '#ffffff';
+            pCtx.fillStyle = eraserColor;
+            eraserRects.forEach(r => {
+                pCtx.fillRect(r.x, r.y, r.w, r.h);
+            });
+        }
+
+        invertToggle.addEventListener('change', renderPreviewCanvas);
+
+        function setupStage() {
+            if (!sourceOriginalCanvas) return;
+
+            const maxW = workspaceContainer.clientWidth - 96;
+            const maxH = workspaceContainer.clientHeight - 96;
+
+            stageScale = Math.min(maxW / sourceWidth, maxH / sourceHeight);
+            const stageW = Math.round(sourceWidth * stageScale);
+            const stageH = Math.round(sourceHeight * stageScale);
+
+            imageStage.style.width = `${stageW}px`;
+            imageStage.style.height = `${stageH}px`;
+
+            previewCanvas.style.width = `${stageW}px`;
+            previewCanvas.style.height = `${stageH}px`;
+
+            renderPreviewCanvas();
+            initCropBox(stageW, stageH);
+        }
+
+        function initCropBox(stageW, stageH) {
+            let h = stageH * 0.8;
+            let w = h * ASPECT_RATIO;
+
+            if (w > stageW * 0.9) {
+                w = stageW * 0.9;
+                h = w / ASPECT_RATIO;
+            }
+
+            cropState.w = Math.round(w);
+            cropState.h = Math.round(h);
+            cropState.x = Math.round((stageW - cropState.w) / 2);
+            cropState.y = Math.round((stageH - cropState.h) / 2);
+
+            updateCropBoxUI();
+        }
+
+        function updateCropBoxUI() {
+            cropBox.style.left = `${cropState.x}px`;
+            cropBox.style.top = `${cropState.y}px`;
+            cropBox.style.width = `${cropState.w}px`;
+            cropBox.style.height = `${cropState.h}px`;
+        }
+
+        centerCropBtn.addEventListener('click', () => {
+            const stageW = imageStage.clientWidth;
+            const stageH = imageStage.clientHeight;
+            cropState.x = Math.round((stageW - cropState.w) / 2);
+            cropState.y = Math.round((stageH - cropState.h) / 2);
+            updateCropBoxUI();
+        });
+
+        resetCropBtn.addEventListener('click', () => {
+            setupStage();
+        });
+
+        let isDraggingBox = false;
+        let isResizingBox = false;
+        let isDrawingEraser = false;
+        let activeHandle = null;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let initialCropState = {};
+        let eraserStartStageX = 0;
+        let eraserStartStageY = 0;
+
+        cropBox.addEventListener('mousedown', onCropPointerDown);
+        cropBox.addEventListener('touchstart', onCropPointerDown, { passive: false });
+
+        imageStage.addEventListener('mousedown', onStagePointerDown);
+        imageStage.addEventListener('touchstart', onStagePointerDown, { passive: false });
+
+        function getPos(e) {
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: clientX, y: clientY };
+        }
+
+        function onCropPointerDown(e) {
+            if (currentMode !== 'crop') return;
+            e.stopPropagation();
+            e.preventDefault();
+            const pos = getPos(e);
+            dragStartX = pos.x;
+            dragStartY = pos.y;
+            initialCropState = { ...cropState };
+
+            if (e.target.classList.contains('crop-handle')) {
+                isResizingBox = true;
+                activeHandle = e.target.getAttribute('data-handle');
+            } else {
+                isDraggingBox = true;
+            }
+
+            window.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('touchmove', onPointerMove, { passive: false });
+            window.addEventListener('mouseup', onPointerUp);
+            window.addEventListener('touchend', onPointerUp);
+        }
+
+        function onStagePointerDown(e) {
+            if (currentMode !== 'eraser') return;
+            if (e.target === cropBox || e.target.classList.contains('crop-handle')) return;
+            e.preventDefault();
+
+            const rect = imageStage.getBoundingClientRect();
+            const pos = getPos(e);
+            eraserStartStageX = pos.x - rect.left;
+            eraserStartStageY = pos.y - rect.top;
+
+            isDrawingEraser = true;
+            eraserSelectBox.style.left = `${eraserStartStageX}px`;
+            eraserSelectBox.style.top = `${eraserStartStageY}px`;
+            eraserSelectBox.style.width = `0px`;
+            eraserSelectBox.style.height = `0px`;
+            eraserSelectBox.classList.remove('hidden');
+
+            window.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('touchmove', onPointerMove, { passive: false });
+            window.addEventListener('mouseup', onPointerUp);
+            window.addEventListener('touchend', onPointerUp);
+        }
+
+        function onPointerMove(e) {
+            if (!isDraggingBox && !isResizingBox && !isDrawingEraser) return;
+            e.preventDefault();
+            const pos = getPos(e);
+            const dx = pos.x - dragStartX;
+            const dy = pos.y - dragStartY;
+
+            if (currentMode === 'crop') {
+                if (isDraggingBox) {
+                    cropState.x = initialCropState.x + dx;
+                    cropState.y = initialCropState.y + dy;
+                } else if (isResizingBox) {
+                    let newW = initialCropState.w;
+                    if (activeHandle === 'se' || activeHandle === 'ne') {
+                        newW = Math.max(60, initialCropState.w + dx);
+                    } else if (activeHandle === 'sw' || activeHandle === 'nw') {
+                        newW = Math.max(60, initialCropState.w - dx);
+                    }
+                    let newH = newW / ASPECT_RATIO;
+
+                    if (activeHandle === 'se') {
+                        cropState.w = newW;
+                        cropState.h = newH;
+                    } else if (activeHandle === 'ne') {
+                        cropState.y = initialCropState.y - (newH - initialCropState.h);
+                        cropState.w = newW;
+                        cropState.h = newH;
+                    } else if (activeHandle === 'sw') {
+                        cropState.x = initialCropState.x - (newW - initialCropState.w);
+                        cropState.w = newW;
+                        cropState.h = newH;
+                    } else if (activeHandle === 'nw') {
+                        cropState.x = initialCropState.x - (newW - initialCropState.w);
+                        cropState.y = initialCropState.y - (newH - initialCropState.h);
+                        cropState.w = newW;
+                        cropState.h = newH;
+                    }
+                }
+                updateCropBoxUI();
+            } else if (currentMode === 'eraser' && isDrawingEraser) {
+                const rect = imageStage.getBoundingClientRect();
+                const currentStageX = pos.x - rect.left;
+                const currentStageY = pos.y - rect.top;
+
+                const boxX = Math.min(eraserStartStageX, currentStageX);
+                const boxY = Math.min(eraserStartStageY, currentStageY);
+                const boxW = Math.abs(currentStageX - eraserStartStageX);
+                const boxH = Math.abs(currentStageY - eraserStartStageY);
+
+                eraserSelectBox.style.left = `${boxX}px`;
+                eraserSelectBox.style.top = `${boxY}px`;
+                eraserSelectBox.style.width = `${boxW}px`;
+                eraserSelectBox.style.height = `${boxH}px`;
+            }
+        }
+
+        function onPointerUp(e) {
+            if (currentMode === 'eraser' && isDrawingEraser) {
+                isDrawingEraser = false;
+                eraserSelectBox.classList.add('hidden');
+
+                const style = window.getComputedStyle(eraserSelectBox);
+                const stageBoxX = parseFloat(style.left);
+                const stageBoxY = parseFloat(style.top);
+                const stageBoxW = parseFloat(style.width);
+                const stageBoxH = parseFloat(style.height);
+
+                if (stageBoxW > 5 && stageBoxH > 5) {
+                    const srcX = Math.round(stageBoxX / stageScale);
+                    const srcY = Math.round(stageBoxY / stageScale);
+                    const srcW = Math.round(stageBoxW / stageScale);
+                    const srcH = Math.round(stageBoxH / stageScale);
+
+                    eraserRects.push({ x: srcX, y: srcY, w: srcW, h: srcH });
+                    updateEraserBadge();
+                    renderPreviewCanvas();
+                }
+            }
+
+            isDraggingBox = false;
+            isResizingBox = false;
+            activeHandle = null;
+
+            window.removeEventListener('mousemove', onPointerMove);
+            window.removeEventListener('touchmove', onPointerMove);
+            window.removeEventListener('mouseup', onPointerUp);
+            window.removeEventListener('touchend', onPointerUp);
+        }
+
+        undoEraserBtn.addEventListener('click', () => {
+            if (eraserRects.length > 0) {
+                eraserRects.pop();
+                updateEraserBadge();
+                renderPreviewCanvas();
+            }
+        });
+
+        function updateEraserBadge() {
+            eraserCountBadge.textContent = `${eraserRects.length}`;
+            undoEraserBtn.disabled = eraserRects.length === 0;
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            if (!sourceOriginalCanvas) return;
+
+            try {
+                const targetW = parseInt(resolutionSelect.value, 10);
+                const targetH = Math.round(targetW * (1920 / 1080));
+
+                const exportCanvas = document.createElement('canvas');
+                exportCanvas.width = targetW;
+                exportCanvas.height = targetH;
+                const expCtx = exportCanvas.getContext('2d');
+
+                // Fill missing/out-of-bounds areas with white if Invert is OFF, or black if Invert is ON
+                expCtx.fillStyle = invertToggle.checked ? '#000000' : '#ffffff';
+                expCtx.fillRect(0, 0, targetW, targetH);
+
+                const workingCanvas = document.createElement('canvas');
+                workingCanvas.width = sourceWidth;
+                workingCanvas.height = sourceHeight;
+                const wCtx = workingCanvas.getContext('2d');
+                const activeSource = invertToggle.checked ? sourceInvertedCanvas : sourceOriginalCanvas;
+                wCtx.drawImage(activeSource, 0, 0);
+
+                const eraserColor = invertToggle.checked ? '#000000' : '#ffffff';
+                wCtx.fillStyle = eraserColor;
+                eraserRects.forEach(r => {
+                    wCtx.fillRect(r.x, r.y, r.w, r.h);
+                });
+
+                const srcCropX = cropState.x / stageScale;
+                const srcCropY = cropState.y / stageScale;
+                const srcCropW = cropState.w / stageScale;
+                const srcCropH = cropState.h / stageScale;
+
+                const scaleToTarget = targetW / srcCropW;
+
+                const drawX = -srcCropX * scaleToTarget;
+                const drawY = -srcCropY * scaleToTarget;
+                const drawW = sourceWidth * scaleToTarget;
+                const drawH = sourceHeight * scaleToTarget;
+
+                expCtx.imageSmoothingEnabled = true;
+                expCtx.imageSmoothingQuality = 'high';
+                expCtx.drawImage(workingCanvas, drawX, drawY, drawW, drawH);
+
+                const dataUrl = exportCanvas.toDataURL('image/png', 1.0);
+                const link = document.createElement('a');
+                link.download = `${targetW}x${targetH}-output.png`;
+                link.href = dataUrl;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                console.error(err);
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (sourceOriginalCanvas) {
+                setupStage();
+            }
+        });
+    </script>
+</body>
+</html>
